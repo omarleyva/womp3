@@ -817,15 +817,19 @@ add_block(ospfs_inode_t *oi)
 	    allocated[0] = allocate_block();
 	    
 	    if(allocated[0] == 0) //Unable to allocate a block
-	      return -ENOSPC; 
+	      {
+		if(i2blockblocknum == 0)
+		  free_block(allocated[1]);
+		return -ENOSPC; 
+	      }
 	    memset(ospfs_block(allocated[0]),0,OSPFS_BLKSIZE);
 	    
 	    i2block[i2blockblocknum] = allocated[0];	     
 	  }
-
-
-
-
+	else
+	  return -ENOSPC;
+	
+	oi->oi_size += OSPFS_BLKSIZE;
 	return 0;
 	
 
@@ -857,11 +861,80 @@ add_block(ospfs_inode_t *oi)
 static int
 remove_block(ospfs_inode_t *oi)
 {
-	// current number of blocks in file
-	uint32_t n = ospfs_size2nblocks(oi->oi_size);
+  // current number of blocks in file
+  uint32_t n = ospfs_size2nblocks(oi->oi_size);
+  
+  if(n <= 0) //no blocks exist
+    return -EIO;
 
-	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
+  //Less than direct block pointer
+  if(n <= OSPFS_NDIRECT)
+    {
+      free_block(oi->oi_direct[n-1]);
+      oi->oi_direct[n-1] = 0;
+    }
+  
+  if (n > OSPFS_NDIRECT && n <= OSPFS_NINDIRECT+OSPFS_NDIRECT)
+    {	
+      unint32_t *indirect_block = ospfs_block(oi->oi_indirect);
+      
+      free_block(indirect_block[n-OSPFS_NDIRECT-1]);
+      indirect_block[n-OSPFS_NDIRECT-1] = 0;
+      
+      //Remove direct block
+      if(n == (OSPFS_NDIRECT+1))
+	{	
+	  free_block(oi->oi_indirect);
+	  oi->oi_indirect = 0;
+	}      
+    }
+    
+  if(n > (OSPFS_NINDIRECT + OSPFS_NDIRECT) && n <= (OSPFS_NDIRECT+OSPFS_NINDIRECT*(OSPFS_NINDIRECT+1)))
+    {    
+      uint32_t i2blocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))/OSPFS_NINDIRECT;
+      uint32_t i2blockblocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))%OSPFS_NINDIRECT;     
+      
+      if(i2blockblocknum == 0) // Block before is full. Must remove from block before
+	{
+	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum-1]);
+	  freeblock(i2block[OSPFS_NINDIRECT-1]);
+	  i2block[OSPFS_NINDIRECT-1] = 0;
+	}
+      
+      else if((i2blockblocknum-1) == 0) //Current block must be removed
+	{
+	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
+	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
+
+	  freeblock(i2block[i2blockblocknum-1]);
+	  i2block[i2blockblocknum-1] = 0;	  	
+
+	  free_block(i2bl[i2blocknum]);
+	  i2block[i2blocknum] = 0;
+	  
+	  if(i2blocknum == 0)
+	    {
+	      free_block(oi->oi_indirect2);
+	      oi->oi_indirect2 = 0;
+	    } 
+	} 
+      else
+	{
+	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
+	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
+	  
+	  freeblock(i2block[i2blockblocknum-1]);
+	  i2block[i2blockblocknum-1] = 0;	  		  
+	}
+      oi->oi_size -= OSPFS_BLKSIZE;
+           
+    }
+  else
+    return -EIO; //File contained too much memory already
+  
+  oi->oi_size -= OSPFS_BLKSIZE;
+  return 0;  
+  
 }
 
 
