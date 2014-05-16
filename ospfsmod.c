@@ -1264,10 +1264,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 
   return dir;
 
-
-
- 
-	return ERR_PTR(-EINVAL); // Replace this line
+  //return ERR_PTR(-EINVAL); // Replace this line
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
@@ -1345,7 +1342,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	if(find_direntry(dir_oi,dentry->d_name.name,dentry->d_name.len) != NULL)
 	  return -EEXIST;	
 	
-	ospfs_direntry_t *new_entry = create_blank_direntry(dir_oi);
+/*	ospfs_direntry_t *new_entry = create_blank_direntry(dir_oi);
 	if (IS_ERR(new_entry))
 	  return PTR_ERR(new_entry);
 	
@@ -1384,7 +1381,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	 entry_inode->oi_mode = mode;
 	 eprintk("hi\n");
 
-	 
+*/	 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
 	   getting here. */
