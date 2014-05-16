@@ -737,6 +737,8 @@ add_block(ospfs_inode_t *oi)
 	// keep track of allocations to free in case of -ENOSPC
 	uint32_t allocated[2] = { 0, 0 };
 
+	eprintk("%d\n",n);
+
 	//Less than direct block pointer
 	if(n < OSPFS_NDIRECT)
 	  {
@@ -747,7 +749,7 @@ add_block(ospfs_inode_t *oi)
 	    oi->oi_direct[n] = allocated[0];
 	  }
 
-	if(n == OSPFS_NDIRECT) //Must allocate indirect block
+	else if(n == OSPFS_NDIRECT) //Must allocate indirect block
 	  {
 	    allocated[0] = allocate_block();
 	    if(allocated[0] == 0) //Unable to allocate a block
@@ -771,7 +773,7 @@ add_block(ospfs_inode_t *oi)
             oi->oi_indirect = allocated[0];
 	  }
 
-	if (n > OSPFS_NDIRECT && n < OSPFS_NINDIRECT+OSPFS_NDIRECT)
+	else if (n > OSPFS_NDIRECT && n < OSPFS_NINDIRECT+OSPFS_NDIRECT)
 	  {
        	    allocated[0] = allocate_block();
 	    if(allocated[0] == 0) //Unable to allocate a block
@@ -783,7 +785,7 @@ add_block(ospfs_inode_t *oi)
 	    indirect_block[n-OSPFS_NDIRECT] = allocated[0];
 	  }
 
-	if(n == (OSPFS_NINDIRECT + OSPFS_NDIRECT)) //Must allocate indirect block
+	else if(n == (OSPFS_NINDIRECT + OSPFS_NDIRECT)) //Must allocate indirect block
 	  {
 	    oi->oi_indirect2 = allocate_block();
 	    if (oi->oi_indirect2 == 0) // Unable to allocate a block
@@ -794,7 +796,7 @@ add_block(ospfs_inode_t *oi)
 	    memset(indirect2_block,0,OSPFS_BLKSIZE);
 	  }      
 
-	if(n >= (OSPFS_NINDIRECT + OSPFS_NDIRECT) && n < (OSPFS_NDIRECT+OSPFS_NINDIRECT*(OSPFS_NINDIRECT+1)))
+	else if(n >= (OSPFS_NINDIRECT + OSPFS_NDIRECT) && n < (OSPFS_NDIRECT+OSPFS_NINDIRECT*(OSPFS_NINDIRECT+1)))
 	  {
 	    
 	    uint32_t i2blocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))/OSPFS_NINDIRECT;
@@ -831,8 +833,7 @@ add_block(ospfs_inode_t *oi)
 	
 	oi->oi_size += OSPFS_BLKSIZE;
 	return 0;
-	
-
+       
 }
 
 
@@ -874,7 +875,7 @@ remove_block(ospfs_inode_t *oi)
       oi->oi_direct[n-1] = 0;
     }
   
-  if (n > OSPFS_NDIRECT && n <= OSPFS_NINDIRECT+OSPFS_NDIRECT)
+  else if (n > OSPFS_NDIRECT && n <= OSPFS_NINDIRECT+OSPFS_NDIRECT)
     {	
       uint32_t *indirect_block = ospfs_block(oi->oi_indirect);
       
@@ -889,7 +890,7 @@ remove_block(ospfs_inode_t *oi)
 	}      
     }
     
-  if(n > (OSPFS_NINDIRECT + OSPFS_NDIRECT) && n <= (OSPFS_NDIRECT+OSPFS_NINDIRECT*(OSPFS_NINDIRECT+1)))
+  else if(n > (OSPFS_NINDIRECT + OSPFS_NDIRECT) && n <= (OSPFS_NDIRECT+OSPFS_NINDIRECT*(OSPFS_NINDIRECT+1)))
     {    
       uint32_t i2blocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))/OSPFS_NINDIRECT;
       uint32_t i2blockblocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))%OSPFS_NINDIRECT;     
@@ -898,7 +899,7 @@ remove_block(ospfs_inode_t *oi)
 	{
 	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum-1]);
-	  freeblock(i2block[OSPFS_NINDIRECT-1]);
+	  free_block(i2block[OSPFS_NINDIRECT-1]);
 	  i2block[OSPFS_NINDIRECT-1] = 0;
 	}
       
@@ -907,7 +908,7 @@ remove_block(ospfs_inode_t *oi)
 	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
 
-	  freeblock(i2block[i2blockblocknum-1]);
+	  free_block(i2block[i2blockblocknum-1]);
 	  i2block[i2blockblocknum-1] = 0;	  	
 
 	  free_block(i2bl[i2blocknum]);
@@ -924,7 +925,7 @@ remove_block(ospfs_inode_t *oi)
 	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
 	  
-	  freeblock(i2block[i2blockblocknum-1]);
+	  free_block(i2block[i2blockblocknum-1]);
 	  i2block[i2blockblocknum-1] = 0;	  		  
 	}
       oi->oi_size -= OSPFS_BLKSIZE;
@@ -1242,8 +1243,30 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	// 2. If there's no empty entries, add a block to the directory.
 	//    Use ERR_PTR if this fails; otherwise, clear out all the directory
 	//    entries and return one of them.
+  ospfs_direntry_t *dir;
+  
+  uint32_t offset;
+  for(offset = 0; offset < dir_oi->oi_size; offset+=OSPFS_DIRENTRY_SIZE) //Iterates through each dir
+    { //entry of the inode.
+      dir = (ospfs_direntry_t*) ospfs_inode_data(dir_oi,offset);
+      if(dir->od_ino == 0) //Inode doesn't exist for that dir entry.
+	return dir;
+    }
+  int r = add_block(dir_oi);
+  if(r < 0)
+    return ERR_PTR(r);
+  
+  dir = (ospfs_direntry_t*) ospfs_inode_data(dir_oi,offset);
 
-	/* EXERCISE: Your code here. */
+  //Initialize directory entry
+  dir->od_ino = 0;
+  dir->od_name[0] = 0;
+
+  return dir;
+
+
+
+ 
 	return ERR_PTR(-EINVAL); // Replace this line
 }
 
@@ -1315,15 +1338,53 @@ static int
 ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
+	ospfs_inode_t *entry_inode;
 	uint32_t entry_ino = 0;
 
 	// Check for the -EEXIST error
 	if(find_direntry(dir_oi,dentry->d_name.name,dentry->d_name.len) != NULL)
-	  return -EEXIST;
+	  return -EEXIST;	
 	
-
+	ospfs_direntry_t *new_entry = create_blank_direntry(dir_oi);
+	if (IS_ERR(new_entry))
+	  return PTR_ERR(new_entry);
 	
+	uint32_t inode_count = 0;
+	for(inode_count = 0; inode_count < ospfs_super->os_ninodes; inode_count++)
+	  {
+	    entry_inode = ospfs_inode(inode_count); //Obtain pointer to new inode
+	    if(entry_inode && entry_inode->oi_nlink == 0) //Empty inode
+	      {
+		eprintk("yoyoyo\n");
+		entry_ino = inode_count;
+		break;
+	      }
+	  }
+	
+	if(entry_ino == 0) //No inode available.
+	  return -ENOSPC;      
+	
+	// Initialize the directory entry
+	 new_entry->od_ino = entry_ino;
 
+	 eprintk("just set inode number\n");
+	 memcpy(new_entry->od_name,dentry->d_name.name,dentry->d_name.len);
+	 eprintk("just copied name onto new entry name\n");
+	 new_entry->od_name[dentry->d_name.len] == '\0';
+	 //Must be null terminated. Length not passed in direntry
+	 eprintk("33\n");
+	 
+	 // 4. Initialize the inode
+	 memset(entry_inode,0,OSPFS_INODESIZE);
+	 eprintk("hi\n");
+	 entry_inode->oi_ftype = OSPFS_FTYPE_REG;
+	 eprintk("hi\n");
+	 entry_inode->oi_nlink++;
+	 eprintk("hi\n");
+	 entry_inode->oi_mode = mode;
+	 eprintk("hi\n");
+
+	 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
 	   getting here. */
