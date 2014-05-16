@@ -735,7 +735,7 @@ add_block(ospfs_inode_t *oi)
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
 	// keep track of allocations to free in case of -ENOSPC
-	uint32_t *allocated[2] = { 0, 0 };
+	uint32_t allocated[2] = { 0, 0 };
 
 	//Less than direct block pointer
 	if(n < OSPFS_NDIRECT)
@@ -876,7 +876,7 @@ remove_block(ospfs_inode_t *oi)
   
   if (n > OSPFS_NDIRECT && n <= OSPFS_NINDIRECT+OSPFS_NDIRECT)
     {	
-      unint32_t *indirect_block = ospfs_block(oi->oi_indirect);
+      uint32_t *indirect_block = ospfs_block(oi->oi_indirect);
       
       free_block(indirect_block[n-OSPFS_NDIRECT-1]);
       indirect_block[n-OSPFS_NDIRECT-1] = 0;
@@ -896,6 +896,7 @@ remove_block(ospfs_inode_t *oi)
       
       if(i2blockblocknum == 0) // Block before is full. Must remove from block before
 	{
+	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum-1]);
 	  freeblock(i2block[OSPFS_NINDIRECT-1]);
 	  i2block[OSPFS_NINDIRECT-1] = 0;
@@ -1315,8 +1316,13 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
-	/* EXERCISE: Your code here. */
-	return -EINVAL; // Replace this line
+
+	// Check for the -EEXIST error
+	if(find_direntry(dir_oi,dentry->d_name.name,dentry->d_name.len) != NULL)
+	  return -EEXIST;
+	
+
+	
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
