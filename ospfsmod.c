@@ -1166,8 +1166,11 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	/* EXERCISE: Your code here */
 
         if (filp->f_flags & O_APPEND)
-            *f_pos = oi->oi_size;	
- 
+	  {
+	    eprintk("appending!");
+	    *f_pos = oi->oi_size;	
+	  }
+	
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
@@ -1421,6 +1424,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	 eprintk("hi\n");
 	 entry_inode->oi_mode = mode;
 	 eprintk("hi\n");
+
 	 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
