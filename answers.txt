@@ -11,14 +11,14 @@
 # information you'd like us to know, please add it at the end of the file.
 
 # Partner 1
-Name: 
-Student ID: 
-Email: 
+Name: Israel Jones Alvarez
+Student ID: 804050501
+Email: ijonesalvarez@ucla.edu
 
 # Partner 2 (if you're working in a team)
-Name: 
-Student ID: 
-Email: 
+Name: Omar Leyva
+Student ID: 504051903
+Email: omarleyva@ucla.edu
 
 # Extra credit problems
 #Extra credit problem: none
