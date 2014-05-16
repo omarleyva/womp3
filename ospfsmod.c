@@ -475,7 +475,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		//Get a pointer to next entry in directory. 
 	  ospfs_direntry_t *od = ospfs_inode_data(dir_oi,(f_pos-2)*OSPFS_DIRENTRY_SIZE);
 	  ospfs_inode_t *entry_oi = ospfs_inode(od->od_ino);
-	  uint32_t file_type;		  
+	  uint32_t file_type = 0;		  
 	  
 	  //r = 1 when end of directory
 	  if((f_pos-2)*OSPFS_DIRENTRY_SIZE > dir_oi->oi_size)
@@ -737,7 +737,7 @@ add_block(ospfs_inode_t *oi)
 	// keep track of allocations to free in case of -ENOSPC
 	uint32_t allocated[2] = { 0, 0 };
 
-	eprintk("%d\n",n);
+	//eprintk("%d\n",n);
 
 	//Less than direct block pointer
 	if(n < OSPFS_NDIRECT)
@@ -981,7 +981,6 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 {
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
-        int t = 0;
         int add_return = 0;
 
         if (new_size == old_size)
@@ -995,12 +994,12 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
                 if (add_return == -ENOSPC)
                     new_size = old_size;
 	}
-        eprintk("remove old size: %d new size: %d\n", old_size, new_size);
+        //eprintk("remove old size: %d new size: %d\n", old_size, new_size);
 
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
 	        /* EXERCISE: Your code here */
 		//return -EIO; // Replace this line
-                eprintk("remove actual size: %d new size: %d\n");
+                //eprintk("remove actual size: %d new size: %d\n");
                 remove_block(oi);
                 //eprintk("actual: %d target %d\n", oi->oi_size, new_size);
 	}
@@ -1167,7 +1166,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 
         if (filp->f_flags & O_APPEND)
 	  {
-	    eprintk("appending!");
+	    //eprintk("appending!");
 	    *f_pos = oi->oi_size;	
 	  }
 	
@@ -1210,7 +1209,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
                    n = remain;
  
                 if (copy_from_user(data+offset, buffer, n) > 0)
-                    retval -EFAULT;
+                    retval = -EFAULT;
   
 		buffer += n;
 		amount += n;
@@ -1396,7 +1395,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	    entry_inode = ospfs_inode(inode_count); //Obtain pointer to new inode
 	    if(entry_inode && entry_inode->oi_nlink == 0) //Empty inode
 	      {
-		eprintk("yoyoyo\n");
+		//eprintk("yoyoyo\n");
 		entry_ino = inode_count;
 		break;
 	      }
@@ -1408,22 +1407,22 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	// Initialize the directory entry
 	 new_entry->od_ino = entry_ino;
 
-	 eprintk("just set inode number\n");
+	 //eprintk("just set inode number\n");
 	 memcpy(new_entry->od_name,dentry->d_name.name,dentry->d_name.len);
-	 eprintk("just copied name onto new entry name\n");
-	 new_entry->od_name[dentry->d_name.len] == '\0';
+	 //eprintk("just copied name onto new entry name\n");
+	 new_entry->od_name[dentry->d_name.len] = '\0';
 	 //Must be null terminated. Length not passed in direntry
-	 eprintk("33\n");
+	 //eprintk("33\n");
 	 
 	 // 4. Initialize the inode
 	 memset(entry_inode,0,OSPFS_INODESIZE);
-	 eprintk("hi\n");
+	 //eprintk("hi\n");
 	 entry_inode->oi_ftype = OSPFS_FTYPE_REG;
-	 eprintk("hi\n");
+	 //eprintk("hi\n");
 	 entry_inode->oi_nlink++;
-	 eprintk("hi\n");
+	 //eprintk("hi\n");
 	 entry_inode->oi_mode = mode;
-	 eprintk("hi\n");
+	 //eprintk("hi\n");
 
 	 
 	/* Execute this code after your function has successfully created the
@@ -1464,7 +1463,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 static int
 ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
-	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
+	//ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
 
 	/* EXERCISE: Your code here. */
