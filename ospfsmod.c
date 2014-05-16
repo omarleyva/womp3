@@ -998,10 +998,10 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
 	        /* EXERCISE: Your code here */
-		//return -EIO; // Replace this line
+		return -EIO; // Replace this line
                 //eprintk("remove actual size: %d new size: %d\n");
-                remove_block(oi);
-                eprintk("actual: %d target %d\n", oi->oi_size, new_size);
+                //remove_block(oi);
+                //eprintk("actual: %d target %d\n", oi->oi_size, new_size);
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
