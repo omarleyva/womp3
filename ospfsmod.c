@@ -898,7 +898,7 @@ remove_block(ospfs_inode_t *oi)
 	{
 	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum-1]);
-	  freeblock(i2block[OSPFS_NINDIRECT-1]);
+	  free_block(i2block[OSPFS_NINDIRECT-1]);
 	  i2block[OSPFS_NINDIRECT-1] = 0;
 	}
       
@@ -907,7 +907,7 @@ remove_block(ospfs_inode_t *oi)
 	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
 
-	  freeblock(i2block[i2blockblocknum-1]);
+	  free_block(i2block[i2blockblocknum-1]);
 	  i2block[i2blockblocknum-1] = 0;	  	
 
 	  free_block(i2bl[i2blocknum]);
@@ -924,7 +924,7 @@ remove_block(ospfs_inode_t *oi)
 	  uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
 	  uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
 	  
-	  freeblock(i2block[i2blockblocknum-1]);
+	  free_block(i2block[i2blockblocknum-1]);
 	  i2block[i2blockblocknum-1] = 0;	  		  
 	}
       oi->oi_size -= OSPFS_BLKSIZE;
@@ -980,19 +980,41 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 {
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
+        int t = 0;
+        int add_return = 0;
 
-	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) {
+        if (new_size == old_size)
+            return r;
+
+	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size))
+        {
 	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+		//return -EIO; // Replace this line
+                add_return = add_block(oi);
+                if (add_return == -ENOSPC)
+                    new_size = old_size;
 	}
+        eprintk("remove old size: %d new size: %d\n", old_size, new_size);
+
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
 	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+		//return -EIO; // Replace this line
+                //eprintk("remove actual size: %d new size: %d\n");
+                remove_block(oi);
+                eprintk("actual: %d target %d\n", oi->oi_size, new_size);
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
 	             and return the proper value. */
-	return -EIO; // Replace this line
+	//return -EIO; // Replace this line
+
+        if (add_return == -ENOSPC)
+           return -ENOSPC;
+        else
+        {
+            oi->oi_size = new_size;
+            return r;
+        }
 }
 
 
