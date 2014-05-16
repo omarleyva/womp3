@@ -735,8 +735,14 @@ add_block(ospfs_inode_t *oi)
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
 	// keep track of allocations to free in case of -ENOSPC
-	uint32_t allocated[2] = { 0, 0 };
-
+	uint32_t allocated[2] = { 0, 0 };       
+	uint32_t i2blocknum;
+	uint32_t i2blockblocknum;
+	uint32_t *indirect_block = NULL;
+	uint32_t *indirect2_block = NULL;
+	uint32_t *i2bl = NULL;
+	uint32_t *i2block = NULL;
+	
 	eprintk("%d\n",n);
 
 	//Less than direct block pointer
@@ -764,7 +770,7 @@ add_block(ospfs_inode_t *oi)
 	      }	    
 
 	    //Create new indirect_block
-	    uint32_t *indirect_block = ospfs_block(allocated[0]);
+	    indirect_block = ospfs_block(allocated[0]);
 	    memset(indirect_block,0,OSPFS_BLKSIZE);
 	    memset(ospfs_block(allocated[1]),0,OSPFS_BLKSIZE);
 	    
@@ -780,7 +786,7 @@ add_block(ospfs_inode_t *oi)
 	      return -ENOSPC; 
 	    memset(ospfs_block(allocated[0]),0,OSPFS_BLKSIZE);
 	    
-	    uint32_t *indirect_block = ospfs_block(oi->oi_indirect);
+	    indirect_block = ospfs_block(oi->oi_indirect);
 	    
 	    indirect_block[n-OSPFS_NDIRECT] = allocated[0];
 	  }
@@ -792,15 +798,15 @@ add_block(ospfs_inode_t *oi)
 		return -ENOSPC;
 	  
 	    //Create new indirect2_block
-	    uint32_t *indirect2_block = ospfs_block(oi->oi_indirect2);
+	    indirect2_block = ospfs_block(oi->oi_indirect2);
 	    memset(indirect2_block,0,OSPFS_BLKSIZE);
 	  }      
 
 	else if(n >= (OSPFS_NINDIRECT + OSPFS_NDIRECT) && n < (OSPFS_NDIRECT+OSPFS_NINDIRECT*(OSPFS_NINDIRECT+1)))
 	  {
 	    
-	    uint32_t i2blocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))/OSPFS_NINDIRECT;
-	    uint32_t i2blockblocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))%OSPFS_NINDIRECT;
+	    i2blocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))/OSPFS_NINDIRECT;
+	    i2blockblocknum = (n-(OSPFS_NINDIRECT + OSPFS_NDIRECT))%OSPFS_NINDIRECT;
 
 	    if(i2blockblocknum == 0) //Need to allocate new i2blockblock
 	      {
@@ -811,11 +817,11 @@ add_block(ospfs_inode_t *oi)
 		//Create new indirect_block
 		memset(ospfs_block(allocated[1]),0,OSPFS_BLKSIZE);
 				
-		uint32_t *indirect_block = ospfs_block(oi->oi_indirect2);
+		indirect_block = ospfs_block(oi->oi_indirect2);
                 indirect_block[i2blocknum] = allocated[1];
 	      }	
-	    uint32_t *i2bl = ospfs_block(oi->oi_indirect2);
-	    uint32_t *i2block = ospfs_block(i2bl[i2blocknum]);
+	    i2bl = ospfs_block(oi->oi_indirect2);
+	    i2block = ospfs_block(i2bl[i2blocknum]);
 	    allocated[0] = allocate_block();
 	    
 	    if(allocated[0] == 0) //Unable to allocate a block
@@ -1094,7 +1100,9 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
 		uint32_t n;
 		char *data;
+		uint32_t offset;
 		uint32_t remain = count - amount;
+		int ctu;
 		
 		// ospfs_inode_blockno returns 0 on error
 		if (blockno == 0) {
@@ -1112,14 +1120,14 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		//retval = -EIO; // Replace these lines
 		//goto done;
 
-		uint32_t offset = *f_pos % OSPFS_BLKSIZE; 
+		offset = *f_pos % OSPFS_BLKSIZE; 
                 n = OSPFS_BLKSIZE - offset; 
 		
                 if (n > remain)
 		  n = remain;          
 		
 		// printk("copying to user\n");
-                int ctu = copy_to_user(buffer, data+offset, n);
+                ctu = copy_to_user(buffer, data+offset, n);
                 if (ctu > 0)
 		  {
                     printk ("bytes over: %d\n", ctu);
@@ -1187,6 +1195,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		uint32_t n;
 		char *data;
                 uint32_t remain = count - amount;
+                uint32_t offset;
 
 		if (blockno == 0) {
 			retval = -EIO;
@@ -1203,11 +1212,11 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		//retval = -EIO; // Replace these lines
 		//goto done;
 
-                uint32_t offset = *f_pos % OSPFS_BLKSIZE;
+		offset = *f_pos % OSPFS_BLKSIZE;
                 n = OSPFS_BLKSIZE - offset;
 
                 if (n > remain)
-                   n = remain;
+		  n = remain;
  
                 if (copy_from_user(data+offset, buffer, n) > 0)
                     retval -EFAULT;
@@ -1291,7 +1300,8 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
   
   uint32_t offset;
   for(offset = 0; offset < dir_oi->oi_size; offset+=OSPFS_DIRENTRY_SIZE) //Iterates through each dir
-    { //entry of the inode.
+    { 
+      //Entry of the inode.
       dir = (ospfs_direntry_t*) ospfs_inode_data(dir_oi,offset);
       if(dir->od_ino == 0) //Inode doesn't exist for that dir entry.
 	return dir;
@@ -1302,9 +1312,9 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
   
   dir = (ospfs_direntry_t*) ospfs_inode_data(dir_oi,offset);
 
-  //Initialize directory entry
-  dir->od_ino = 0;
-  dir->od_name[0] = 0;
+  // //Initialize directory entry
+  //dir->od_ino = 0;
+  //dir->od_name[0] = 0;
 
   return dir;
 
@@ -1404,14 +1414,14 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	
 	if(entry_ino == 0) //No inode available.
 	  return -ENOSPC;      
-	
+       
 	// Initialize the directory entry
 	 new_entry->od_ino = entry_ino;
 
 	 eprintk("just set inode number\n");
 	 memcpy(new_entry->od_name,dentry->d_name.name,dentry->d_name.len);
 	 eprintk("just copied name onto new entry name\n");
-	 new_entry->od_name[dentry->d_name.len] == '\0';
+	 new_entry->od_name[dentry->d_name.len] = '\0';
 	 //Must be null terminated. Length not passed in direntry
 	 eprintk("33\n");
 	 
