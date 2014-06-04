@@ -162,9 +162,9 @@ static inline ospfs_inode_t *
 ospfs_inode(ino_t ino)
 {
 	ospfs_inode_t *oi;
-	if (ino >= ospfs_super->os_ninodes)
+	if (ino >= ospfs_super->os_ninodes[0])
 		return 0;
-	oi = ospfs_block(ospfs_super->os_firstinob);
+	oi = ospfs_block(ospfs_super->os_firstinob[0]);
 	return &oi[ino];
 }
 
@@ -1405,7 +1405,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	  return PTR_ERR(new_entry);
 	
 
-	for(inode_count = 0; inode_count < ospfs_super->os_ninodes; inode_count++)
+	for(inode_count = 0; inode_count < ospfs_super->os_ninodes[0]; inode_count++)
 	  {
 	    entry_inode = ospfs_inode(inode_count); //Obtain pointer to new inode
 	    if(entry_inode && entry_inode->oi_nlink == 0) //Empty inode

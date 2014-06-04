@@ -171,8 +171,8 @@ swizzleblock(struct Block *b)
 		s = (struct ospfs_super*) &b->u;
 		swizzle(&s->os_magic);
 		swizzle(&s->os_nblocks);
-		swizzle(&s->os_ninodes);
-		swizzle(&s->os_firstinob);
+		swizzle(&s->os_ninodes[0]);
+		swizzle(&s->os_firstinob[0]);
 		break;
 	case BLOCK_DIR:
 		for (i = 0; i < OSPFS_BLKSIZE; i += OSPFS_DIRENTRY_SIZE) {
@@ -309,8 +309,8 @@ opendisk(const char *name)
 
 	super.os_magic = OSPFS_MAGIC;
 	super.os_nblocks = nblocks;
-	super.os_ninodes = ninodes;
-	super.os_firstinob = OSPFS_FREEMAP_BLK + nbitblock;
+	super.os_ninodes[0] = ninodes;
+	super.os_firstinob[0] = OSPFS_FREEMAP_BLK + nbitblock;
 	if (verbose)
 		fprintf(stderr, "superblock, free block bitmap %d, first inode block %d, first data block %d\n", OSPFS_FREEMAP_BLK, super.os_firstinob, nextb);
 }
@@ -368,7 +368,7 @@ allocinode(uint32_t *ino, struct Block **ib)
 	}
 
 	*ino = nextinode++;
-	*ib = getblk(super.os_firstinob + *ino / OSPFS_BLKINODES, 0, BLOCK_INODES);
+	*ib = getblk(super.os_firstinob[0] + *ino / OSPFS_BLKINODES, 0, BLOCK_INODES);
 	return &(*ib)->u.ino[*ino % OSPFS_BLKINODES];
 }
 
@@ -486,7 +486,7 @@ writefile(struct ospfs_inode *dirino, const char *name, unsigned long host_ino, 
 			add_hardlink(host_ino, de->od_ino, md5_digest);
 	} else {
 		de->od_ino = hardlink_ino;
-		inob = getblk(super.os_firstinob + hardlink_ino / OSPFS_BLKINODES, 0, BLOCK_INODES);
+		inob = getblk(super.os_firstinob[0] + hardlink_ino / OSPFS_BLKINODES, 0, BLOCK_INODES);
 		ino = &inob->u.ino[hardlink_ino % OSPFS_BLKINODES];
 		ino->oi_nlink++;
 
@@ -558,7 +558,7 @@ addsymlink(struct ospfs_inode *dirino, const char *name, const char *linkbuf, un
 			add_hardlink(host_ino, de->od_ino, 0);
 	} else {
 		de->od_ino = hardlink_ino;
-		inob = getblk(super.os_firstinob + hardlink_ino / OSPFS_BLKINODES, 0, BLOCK_INODES);
+		inob = getblk(super.os_firstinob[0] + hardlink_ino / OSPFS_BLKINODES, 0, BLOCK_INODES);
 		sino = (struct ospfs_symlink_inode *) &inob->u.ino[hardlink_ino % OSPFS_BLKINODES];
 		sino->oi_nlink++;
 
