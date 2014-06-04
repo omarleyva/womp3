@@ -11,7 +11,7 @@
 # information you'd like us to know, please add it at the end of the file.
 
 # Partner 1
-Name: Israel Jones Alvarez
+Name: Israel Jones-Alvarez
 Student ID: 804050501
 Email: ijonesalvarez@ucla.edu
 

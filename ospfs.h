@@ -60,12 +60,15 @@
 
 #define OSPFS_FREEMAP_BLK  2  // First block in free block
                               // bitmap
+#define OSPFS_NREGIONS 5
+#define OSPFS_RERGIONSIZE (OSPFS_NBLOCKS - 2)/OSPFS_NREGIONS
 
 typedef struct ospfs_super {
 	uint32_t os_magic;     // Magic number: OSPFS_MAGIC
 	uint32_t os_nblocks;   // Number of blocks on disk
-	uint32_t os_ninodes;   // Number of inodes on disk
-	uint32_t os_firstinob; // First inode block
+	uint32_t os_ninodes; //[OSPFS_NREGIONS];   // Number of inodes on disk
+	uint32_t os_firstinob; //[OSPFS_NREGIONS]; // First inode block
+       // uint32_t os_regions[OSPFS_NREGIONS];
 } ospfs_super_t;
 
 
