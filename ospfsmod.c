@@ -589,15 +589,20 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 //   bitvector_test() to do bit operations on the map.
 
 static uint32_t
-allocate_block(void)
+allocate_block(int region)
 {
-  void *freebitmap = ospfs_block(OSPFS_FREEMAP_BLK);
-  
+ 
+  int region_size = (ospfs_super->os_nblocks-2)/OSPFS_NREGIONS;
+  void *freebitmap;
   uint32_t bit_count = 0;
-  for(; bit_count < ospfs_super->os_nblocks; bit_count++)
+
+  freebitmap = ospfs_block(OSPFS_FREEMAP_BLK + region*region_size);
+  
+  for(; bit_count < region_size; bit_count++)
     {
       if(bitvector_test(freebitmap,bit_count) == 1) { //Indicates free block
 	bitvector_clear(freebitmap,bit_count);
+        ospfs_super->os_region_used_blocks[region]++;
 	return bit_count;
       }
     }
@@ -733,7 +738,7 @@ direct_index(uint32_t b)
 //  3) update the oi->oi_size field
 
 static int
-add_block(ospfs_inode_t *oi)
+add_block(ospfs_inode_t *oi, int region)
 {
 	// current number of blocks in file
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
@@ -753,7 +758,7 @@ add_block(ospfs_inode_t *oi)
 	//Less than direct block pointer
 	if(n < OSPFS_NDIRECT)
 	  {
-	    allocated[0] = allocate_block();
+	    allocated[0] = allocate_block(region);
 	    if(allocated[0] == 0) //Unable to allocate a block
 	      return -ENOSPC; 
 	    memset(ospfs_block(allocated[0]),0,OSPFS_BLKSIZE);
@@ -762,11 +767,11 @@ add_block(ospfs_inode_t *oi)
 
         else if(n == OSPFS_NDIRECT) //Must allocate indirect block
 	  {
-	    allocated[0] = allocate_block();
+	    allocated[0] = allocate_block(region);
 	    if(allocated[0] == 0) //Unable to allocate a block
 	      return -ENOSPC; 
 	    	  
-	    allocated[1] = allocate_block();
+	    allocated[1] = allocate_block(region);
             	  
 	    if (allocated[1] == 0) // Unable to allocate a block
               {
@@ -786,7 +791,7 @@ add_block(ospfs_inode_t *oi)
 
 	else if (n > OSPFS_NDIRECT && n < OSPFS_NINDIRECT+OSPFS_NDIRECT)
 	  {
-       	    allocated[0] = allocate_block();
+       	    allocated[0] = allocate_block(region);
 	    if(allocated[0] == 0) //Unable to allocate a block
 	      return -ENOSPC; 
 	    memset(ospfs_block(allocated[0]),0,OSPFS_BLKSIZE);
@@ -798,7 +803,7 @@ add_block(ospfs_inode_t *oi)
 
 	else if(n == (OSPFS_NINDIRECT + OSPFS_NDIRECT)) //Must allocate indirect block
 	  {
-	    oi->oi_indirect2 = allocate_block();
+	    oi->oi_indirect2 = allocate_block(region);
 	    if (oi->oi_indirect2 == 0) // Unable to allocate a block
 		return -ENOSPC;
 	  
@@ -815,7 +820,7 @@ add_block(ospfs_inode_t *oi)
 
 	    if(i2blockblocknum == 0) //Need to allocate new i2blockblock
 	      {
-		allocated[1] = allocate_block();
+		allocated[1] = allocate_block(region);
 		if(allocated[1] == 0) //Unable to allocate a block
 		  return -ENOSPC; 
 		
@@ -827,7 +832,7 @@ add_block(ospfs_inode_t *oi)
 	      }	
 	    i2bl = ospfs_block(oi->oi_indirect2);
 	    i2block = ospfs_block(i2bl[i2blocknum]);
-	    allocated[0] = allocate_block();
+	    allocated[0] = allocate_block(region);
 	    
 	    if(allocated[0] == 0) //Unable to allocate a block
 	      {
@@ -993,17 +998,45 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
         int add_return = 0;
+	int i;
+        int lowest_allocated_blocks = ospfs_super->os_nblocks;
+	int lowest_region = -1;
 
         if (new_size == old_size)
             return r;
 
+	for (i = 0; i < OSPFS_NREGIONS; i++)
+	{
+	    if (ospfs_super->os_region_used_blocks[i] < lowest_allocated_blocks)
+    	    {
+      	        lowest_allocated_blocks = ospfs_super->os_region_used_blocks[i];
+      		lowest_region = i;
+ 	       
+	   }
+ 
+        }
 	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size))
         {
-	        /* EXERCISE: Your code here */
-		//return -EIO; // Replace this line
-                add_return = add_block(oi);
-                if (add_return == -ENOSPC)
-                    new_size = old_size;
+	   /* EXERCISE: Your code here */
+	   //return -EIO; // Replace this line
+           if (lowest_region >= ospfs_super->os_nblocks/OSPFS_NREGIONS)
+	   {
+               	for (i = 0; i < OSPFS_NREGIONS; i++)
+	        {
+	            if (ospfs_super->os_region_used_blocks[i] 
+                                  < lowest_allocated_blocks)
+    	            {
+      	                lowest_allocated_blocks = 
+                                   ospfs_super->os_region_used_blocks[i];
+      		        lowest_region = i;
+ 	       
+	            } 
+ 
+                }
+	   }
+           add_return = add_block(oi,lowest_region);
+           if (add_return == -ENOSPC)
+              new_size = old_size;
 	}
         //eprintk("remove old size: %d new size: %d\n", old_size, new_size);
 
@@ -1312,7 +1345,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	return dir;
     }
   
-  r = add_block(dir_oi);
+  r = add_block(dir_oi,0);
   if(r < 0)
     return ERR_PTR(r);
   
