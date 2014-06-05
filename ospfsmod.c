@@ -161,9 +161,13 @@ ospfs_block(uint32_t blockno)
 static inline ospfs_inode_t *
 ospfs_inode(ino_t ino)
 {
+	// We will find the inode block by cycling through the regions
+	// and finding the region and the block at the region an inode
+	// is at
 	ospfs_inode_t *oi;
-	if (ino >= ospfs_super->os_ninodes[0])
+	if (ino >= (ospfs_super->os_ninodes[0])*OSPFS_NREGIONS)
 		return 0;
+
 	oi = ospfs_block(ospfs_super->os_firstinob[0]);
 	return &oi[ino];
 }
@@ -1403,7 +1407,18 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	new_entry = create_blank_direntry(dir_oi);
 	if (IS_ERR(new_entry))
 	  return PTR_ERR(new_entry);
-	
+
+	// Here we are going to check for a couple things so that we don't have
+	// An artificial inode limit
+	// if ( inodes left in the region )
+	// 	we are done and use this as our new inode
+	// else if ( a block next to the inodes is available )
+	// 	allocate a new inode block and use that
+	// else if ( free space in region to move adjacent block )
+	// 	move block and allocate new inode block where the old 
+	//	one was at
+	// else if ( other regions have space for inode?
+	//	use the other regions
 
 	for(inode_count = 0; inode_count < ospfs_super->os_ninodes[0]; inode_count++)
 	  {
