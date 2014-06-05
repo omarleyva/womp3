@@ -30,7 +30,7 @@ uint32_t ninodes;
 uint32_t nbitblock;
 uint32_t nextb;
 uint32_t nextinode;
-int verbose = 0;
+int verbose = 1;
 int link_contents = 0;
 
 struct Hardlink {
@@ -171,8 +171,11 @@ swizzleblock(struct Block *b)
 		s = (struct ospfs_super*) &b->u;
 		swizzle(&s->os_magic);
 		swizzle(&s->os_nblocks);
-		swizzle(&s->os_ninodes[0]);
-		swizzle(&s->os_firstinob[0]);
+                for (i = 0; i < OSPFS_NREGIONS; i++)
+		{
+			swizzle(&s->os_ninodes[i]);
+			swizzle(&s->os_firstinob[i]);
+		}
 		break;
 	case BLOCK_DIR:
 		for (i = 0; i < OSPFS_BLKSIZE; i += OSPFS_DIRENTRY_SIZE) {

@@ -60,8 +60,8 @@
 
 #define OSPFS_FREEMAP_BLK  2  // First block in free block
                               // bitmap
-#define OSPFS_NREGIONS 5
-#define OSPFS_RERGIONSIZE (OSPFS_NBLOCKS - 2)/OSPFS_NREGIONS
+#define OSPFS_NREGIONS 8
+#define OSPFS_REGIONSIZE (OSPFS_NBLOCKS - 2)/OSPFS_NREGIONS
 
 typedef struct ospfs_super {
 	uint32_t os_magic;     // Magic number: OSPFS_MAGIC
