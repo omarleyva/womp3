@@ -67,7 +67,7 @@ typedef struct ospfs_super {
 	uint32_t os_nblocks;   // Number of blocks on disk
 	uint32_t os_ninodes[OSPFS_NREGIONS];   // Number of inodes on disk
 	uint32_t os_firstinob[OSPFS_NREGIONS]; // First inode block
-        uint32_t os_regions[OSPFS_NREGIONS];
+        uint32_t os_region_used_blocks[OSPFS_NREGIONS]; //Blocks used per region
 } ospfs_super_t;
 
 
