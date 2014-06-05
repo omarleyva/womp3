@@ -30,6 +30,7 @@ uint32_t ninodes;
 uint32_t nbitblock;
 uint32_t nextb;
 uint32_t nextinode;
+uint32_t region_size;
 int verbose = 1;
 int link_contents = 0;
 
@@ -294,17 +295,28 @@ opendisk(const char *name)
 		abort();
 	}
 
-	nbitblock = (nblocks + OSPFS_BLKBITSIZE - 1) / OSPFS_BLKBITSIZE;
-	for (i = 0; i < nbitblock; i++){
-		b = getblk(OSPFS_FREEMAP_BLK + i, 0, BLOCK_BITS);
-		memset(&b->u.b, 0xFF, OSPFS_BLKSIZE);
-		putblk(b);
+	nbitblock = (nblocks/region_size + OSPFS_BLKBITSIZE - 1) 
+				/ OSPFS_BLKBITSIZE;
+	int j;
+	for (j = 0; j < OSPFS_NREGIONS; j++)
+	{
+		for (i = 0; i < nbitblock; i++)
+		{
+			b = getblk(OSPFS_FREEMAP_BLK + i + 
+				(j*region_size), 0, BLOCK_BITS);
+			memset(&b->u.b, 0xFF, OSPFS_BLKSIZE);
+			putblk(b);
+		}
 	}
 
-	ninodeblock = (ninodes + OSPFS_BLKINODES - 1) / OSPFS_BLKINODES;
-	for (i = 0; i < ninodeblock; i++) {
-		b = getblk(OSPFS_FREEMAP_BLK + nbitblock + i, 1, BLOCK_INODES);
-		putblk(b);
+	ninodeblock = (ninodes/OSPFS_NREGIONS + OSPFS_BLKINODES - 1) / OSPFS_BLKINODES;
+	for (j = 0; j < OSPFS_NREGIONS; j++)
+	{
+		for (i = 0; i < ninodeblock; i++) {
+			b = getblk(OSPFS_FREEMAP_BLK + nbitblock + i
+                        	+ (j*region_size), 1, BLOCK_INODES);
+			putblk(b);
+		}
 	}
 
 	nextb = OSPFS_FREEMAP_BLK + nbitblock + ninodeblock;
@@ -312,10 +324,21 @@ opendisk(const char *name)
 
 	super.os_magic = OSPFS_MAGIC;
 	super.os_nblocks = nblocks;
-	super.os_ninodes[0] = ninodes;
-	super.os_firstinob[0] = OSPFS_FREEMAP_BLK + nbitblock;
+
+	for (i = 0; i < OSPFS_NREGIONS; i++)
+		super.os_ninodes[i] = ninodes/OSPFS_NREGIONS;	
+
+        super.os_firstinob[0] = OSPFS_FREEMAP_BLK + nbitblock;
+        for (i = 1; i < OSPFS_NREGIONS; i++)
+	{
+		super.os_firstinob[i] = super.os_firstinob[i-1] + region_size;
+	}
+
 	if (verbose)
-		fprintf(stderr, "superblock, free block bitmap %d, first inode block %d, first data block %d\n", OSPFS_FREEMAP_BLK, super.os_firstinob, nextb);
+	{
+		for (i = 0; i < OSPFS_NREGIONS; i++)
+		fprintf(stderr, "superblock, free block bitmap %d, first inode block %d, first data block %d\n", OSPFS_FREEMAP_BLK + i*region_size, super.os_firstinob[i], nextb+i*region_size);
+	}
 }
 
 void
@@ -782,6 +805,7 @@ main(int argc, char **argv)
 		usage();
 
 	nblocks = strtol(argv[2], &s, 0);
+	region_size = (nblocks-2)/OSPFS_NREGIONS;
 	if (*s || s == argv[2] || nblocks < 2 || nblocks > 8192)
 		usage();
 
