@@ -624,11 +624,20 @@ allocate_block(int region)
 static void
 free_block(uint32_t blockno)
 {
-  void *freebitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+  int region;
+  int offset;
+  void *freebitmap;
+  int region_size = ospfs_super->os_nblocks/OSPFS_NREGIONS;
+
+  region = blockno / region_size;
+  offset = blockno % region_size;
+
+
+  freebitmap = ospfs_block(OSPFS_FREEMAP_BLK + region*region_size);
 
   //Check if block is bogus
   //  if(blockno >= (ospfs_super->os_firstinob+ospfs_super->os_nblocks) && blockno < ospfs_super->os_nblocks)
-  bitvector_set(freebitmap,blockno);
+  bitvector_set(freebitmap,offset);
 
 }
 
@@ -1335,6 +1344,9 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	//    entries and return one of them.
   ospfs_direntry_t *dir;
   int r;
+  int i;
+  int lowest_region = 0;
+  int lowest_allocated_blocks = ospfs_super->os_nblocks;
   
   uint32_t offset;
   for(offset = 0; offset < dir_oi->oi_size; offset+=OSPFS_DIRENTRY_SIZE) //Iterates through each dir
@@ -1344,8 +1356,19 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
       if(dir->od_ino == 0) //Inode doesn't exist for that dir entry.
 	return dir;
     }
-  
-  r = add_block(dir_oi,0);
+ 
+
+  for (i = 0; i < OSPFS_NREGIONS; i++)
+  {
+    if (ospfs_super->os_region_used_blocks[i] < lowest_allocated_blocks)
+    {
+       lowest_allocated_blocks = ospfs_super->os_region_used_blocks[i];
+       lowest_region = i;
+ 	       
+    }
+  }
+ 
+  r = add_block(dir_oi,lowest_region);
   if(r < 0)
     return ERR_PTR(r);
   
